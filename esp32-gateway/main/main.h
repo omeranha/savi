@@ -33,6 +33,13 @@ typedef struct {
 } __attribute__((packed)) sensor_data_msg_t;
 
 typedef struct {
+    uint8_t type;           /* MSG_SENSOR_EVENT */
+    uint32_t esp_id;
+    uint8_t event_id;       /* sensor_event_id_t */
+    float value;
+} __attribute__((packed)) sensor_event_msg_t;
+
+typedef struct {
     uint8_t type;           /* MSG_ASSIGN_ID */
     uint32_t esp_id;
 } __attribute__((packed)) assign_id_msg_t;

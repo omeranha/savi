@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -89,10 +90,10 @@ static void assign_id_to_slave(const uint8_t *mac)
     };
     ensure_peer(mac);
     if (esp_now_send(mac, (uint8_t *)&msg, sizeof(msg)) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to send id %u to " MACSTR, id, MAC2STR(mac));
+        ESP_LOGE(TAG, "Failed to send id %" PRIu32 " to " MACSTR, id, MAC2STR(mac));
         return;
     }
-    ESP_LOGI(TAG, "Assigned esp_id %u to " MACSTR, id, MAC2STR(mac));
+    ESP_LOGI(TAG, "Assigned esp_id %" PRIu32 " to " MACSTR, id, MAC2STR(mac));
 }
 
 static const char *event_name(uint8_t id)
@@ -164,7 +165,7 @@ static void wifi_init(void)
     uint8_t primary = 0;
     wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
     ESP_ERROR_CHECK(esp_wifi_get_channel(&primary, &second));
-    ESP_LOGI(TAG, "STA channel %u — flash the C6 with the same ESPNOW channel", primary);
+    ESP_LOGI(TAG, "STA channel %u - flash the C6 with the same ESPNOW channel", primary);
 }
 
 static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int len)
@@ -204,10 +205,10 @@ static void gateway_task(void *arg)
                 assign_id_to_slave(pkt.mac);
                 continue;
             }
-            ESP_LOGI(TAG, "RX sensor id=%u  T=%.2fC  HR=%u  SpO2=%u",
+            ESP_LOGI(TAG, "RX sensor id=%" PRIu32 "  T=%.2fC  HR=%u  SpO2=%u",
                      msg.esp_id, msg.temperature_c, msg.hr_bpm, msg.spo2_pct);
             if (mysql_db_update_bracelete(&msg) != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to update braceletes for %u", msg.esp_id);
+                ESP_LOGE(TAG, "Failed to update braceletes for %" PRIu32, msg.esp_id);
             }
         } else if (type == MSG_SENSOR_EVENT && pkt.len >= sizeof(sensor_event_msg_t)) {
             sensor_event_msg_t evt;
@@ -216,11 +217,11 @@ static void gateway_task(void *arg)
                 assign_id_to_slave(pkt.mac);
                 continue;
             }
-            ESP_LOGW(TAG, "RX event id=%u  %s  value=%.1f",
+            ESP_LOGW(TAG, "RX event id=%" PRIu32 "  %s  value=%.1f",
                      evt.esp_id, event_name(evt.event_id), evt.value);
             if (evt.event_id == EVENT_MOTION_DETECTED) {
                 if (mysql_db_insert_alerta(evt.esp_id, "MOTION", evt.value) != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to insert alerta for %u", evt.esp_id);
+                    ESP_LOGE(TAG, "Failed to insert alerta for %" PRIu32, evt.esp_id);
                 }
             }
         } else {

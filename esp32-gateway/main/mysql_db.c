@@ -5,6 +5,7 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "mbedtls/md.h"
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,16 +20,16 @@ static const char *TAG = "mysql";
 #define SQL_UPDATE_BRACELETE \
     "UPDATE braceletes SET temperatura=%.2f, bpm=%u, spo2=%u, " \
     "acc_x=%.3f, acc_y=%.3f, acc_z=%.3f, gyro_x=%.3f, gyro_y=%.3f, gyro_z=%.3f " \
-    "WHERE esp_id=%u"
+    "WHERE esp_id=%" PRIu32
 
 #define SQL_INSERT_ALERTA \
-    "INSERT INTO alertas (esp_id, tipo, valor) VALUES (%u, '%s', %.3f)"
+    "INSERT INTO alertas (esp_id, tipo, valor) VALUES (%" PRIu32 ", '%s', %.3f)"
 
 #define SQL_ALLOC_ID \
     "SELECT esp_id FROM braceletes WHERE em_uso=0 ORDER BY esp_id ASC LIMIT 1"
 
 #define SQL_MARK_ID_USED \
-    "UPDATE braceletes SET em_uso=1 WHERE esp_id=%u AND em_uso=0"
+    "UPDATE braceletes SET em_uso=1 WHERE esp_id=%" PRIu32 " AND em_uso=0"
 
 #define CLIENT_LONG_PASSWORD                  0x00000001
 #define CLIENT_LONG_FLAG                      0x00000004
