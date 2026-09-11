@@ -1,0 +1,44 @@
+**Yes — from this firmware you can estimate current, and therefore mAh per hour.** There is no battery size in the code, so the useful number is **average mA** (that is also **mAh used each hour**). These are datasheet + duty-cycle estimates, not a meter reading.
+
+## What the old firmware was doing
+
+The radio stayed in Wi‑Fi **RX the whole time**, CPU at **160 MHz**, sensors **always on**, and two tasks both called `sensors_read()` (event loop every **50 ms**, report every **1 s**). LED/buzzer only run while `motion` is true (buzzer solid on, LED 200 ms blink).
+
+| Block | How the code uses it | Typical current |
+|---|---|---|
+| ESP32-C6 Wi‑Fi | ESP-NOW, radio listening on the channel | **~78 mA RX**; TX ~250–380 mA for a few ms each 1 s (~0.5–1 mA extra) |
+| CPU / peripherals | 160 MHz, I2C, UART logs | **~10–20 mA** on top of the RX figure |
+| MAX30102 | SpO2 mode, 100 Hz, LED_PA `0x24` (~7 mA × 2 LEDs, ~4% duty each) | **~1.8 mA** |
+| BMI270 | Accel + gyro, APS **off**, ~100–200 Hz | **~1.0–1.2 mA** |
+| MAX30205 | Continuous convert | **~0.6 mA** |
+| Indicator LED | GPIO 4, 50% while moving | **~4–10 mA** if a resistor is on the board (unknown in code) |
+| Buzzer | GPIO 5 **held high** for the whole motion | **~15–30 mA** if it is an active buzzer; near **0** if it is a piezo driven with DC |
+
+**Idle (no motion) — original:** about **90–110 mA** → **90–110 mAh per hour**.  
+**While motion alert is on:** about **115–140 mA** → **115–140 mAh per hour**.
+
+On a **500 mAh** cell that is roughly **4.5–5.5 h** idle, **3.5–4.5 h** with the buzzer running. The SoC radio is most of the budget; sensors are only a few mA; the buzzer can double the extras when it is on.
+
+`mAh` over a day is just `I_avg × hours`. Example: 100 mA for 24 h = **2400 mAh**.
+
+## What I changed (same features, less draw)
+
+Motion is still checked every 50 ms, vitals still stream every 1 s, events/LED/buzzer still work, ID assign still uses a fully awake radio.
+
+- One sensor task (no double I2C read).
+- `WIFI_PS_NONE` until ID is stored, then **`WIFI_PS_MIN_MODEM`** (TX-only after pairing).
+- MAX30102 **50 Hz** (HR window is 2 s instead of 1 s).
+- BMI270 **50 Hz** + advanced power save after config.
+- MAX30205 **one-shot ~every 250 ms**, shutdown in between (fever still caught within ~250 ms).
+- Periodic TX logs moved to `DEBUG`.
+
+**Idle after this, typical:** about **35–50 mA** → **35–50 mAh/hour** (modem sleep ~15–30 mA plus sensors ~2–3 mA plus board LDO).  
+**Motion with buzzer:** still **+15–30 mA** for as long as motion stays true.
+
+On **500 mAh**: on the order of **10–14 h** idle, less if the buzzer is often on.
+
+## Hard floor (cannot go much lower without dropping a feature)
+
+MAX30102 red/IR LEDs **must keep pulsing** for HR/SpO2, so that chip cannot sleep. Deep sleep would break 50 ms motion and ESP-NOW. The next real win is **light sleep + 80 MHz** in `menuconfig` (`CONFIG_PM_ENABLE`); I did not turn that on because this tree’s `sdkconfig` is currently **`esp32s2`**, not C6, and light sleep can make pairing RX flaky if it is enabled too early.
+
+LED/buzzer current is set by **hardware** (resistor / buzzer type), not by the firmware. If you tell me battery mAh and whether the buzzer is active or piezo, the life numbers can be tightened.

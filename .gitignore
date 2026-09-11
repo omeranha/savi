@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+/.vscode
+esp32-c6/.clangd
+/esp32-c6/.devcontainer
+/esp32-c6/.vscode
+esp32-gateway/.clangd
+/esp32-gateway/.devcontainer
+/esp32-gateway/.vscode

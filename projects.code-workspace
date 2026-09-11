@@ -1,0 +1,14 @@
+{
+    "folders": [
+      {
+        "path": "./esp32-c6"
+      },
+      {
+        "path": "./esp32-gateway"
+      }
+    ],
+    "settings": {
+      "idf.flashType": "UART"
+    }
+  }
+  
