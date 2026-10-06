@@ -56,12 +56,17 @@ idf.py -p PORT flash monitor
 ## Gateway (`esp32-gateway`)
 
 Connects as a Wi-Fi station (modem sleep off so ESP-NOW RX stays up), then sends
-database requests to Supabase using the ESP-IDF HTTPS client:
+database requests to Supabase using the ESP-IDF HTTPS client. At startup it
+synchronizes its clock with `pool.ntp.org` and uses UTC−3; startup waits for a
+successful sync before enabling ESP-NOW processing.
+The `atualizado_em` value is sent as ISO-8601 with an explicit `-03:00` offset;
+PostgreSQL `TIMESTAMPTZ` stores the corresponding instant, while display timezone
+depends on the database session.
 
 | Incoming | Action |
 | --- | --- |
 | `MSG_NEED_ID` | Allocate an unused `esp_id` from Supabase (`em_uso=false`), mark it used, send `MSG_ASSIGN_ID` unicast |
-| `MSG_SENSOR_DATA` | `PATCH /rest/v1/braceletes` for `esp_id`, updating sensor fields |
+| `MSG_SENSOR_DATA` | `PATCH /rest/v1/braceletes` for `esp_id`, updating sensor fields and `atualizado_em` with an ISO-8601 timestamp containing the `-03:00` offset |
 | `MSG_SENSOR_EVENT` `MOTION` | `POST /rest/v1/alertas` |
 
 Unassigned packets (`esp_id == 0`) trigger the same ID assignment path.

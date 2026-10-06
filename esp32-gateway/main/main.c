@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -12,6 +13,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_now.h"
+#include "esp_netif_sntp.h"
 #include "main.h"
 #include "supabase_db.h"
 
@@ -171,6 +173,32 @@ static void wifi_init(void)
     ESP_LOGI(TAG, "ESP-IDF MAC: %02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
+static void time_sync_init(void)
+{
+    /* POSIX TZ offsets are westward, so UTC+3 means local time UTC-03:00. */
+    if (setenv("TZ", "UTC+3", 1) != 0) {
+        ESP_LOGE(TAG, "Failed to configure UTC-3 timezone");
+        ESP_ERROR_CHECK(ESP_FAIL);
+    }
+    tzset();
+
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    ESP_ERROR_CHECK(esp_netif_sntp_init(&config));
+
+    while (true) {
+        esp_err_t err = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(10000));
+        if (err == ESP_OK) {
+            break;
+        }
+        if (err != ESP_ERR_TIMEOUT) {
+            ESP_ERROR_CHECK(err);
+        }
+        ESP_LOGW(TAG, "Waiting for NTP time synchronization");
+    }
+
+    ESP_LOGI(TAG, "NTP synchronized; timezone is UTC-03:00");
+}
+
 static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int len)
 {
     if (info == NULL || data == NULL || len <= 0) {
@@ -257,6 +285,7 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     wifi_init();
+    time_sync_init();
     ESP_ERROR_CHECK(supabase_db_init());
     ESP_ERROR_CHECK(espnow_init());
     ESP_LOGI(TAG, "Gateway ready");

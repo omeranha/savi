@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <string.h>
 
@@ -501,12 +502,27 @@ esp_err_t supabase_db_update_bracelete(const sensor_data_msg_t *msg)
         !isfinite(msg->gy) || !isfinite(msg->gz)) {
         return ESP_ERR_INVALID_ARG;
     }
+
+    time_t now = time(NULL);
+    struct tm local_time;
+    char timestamp[32];
+    size_t timestamp_length;
+    if (now == (time_t)-1 || localtime_r(&now, &local_time) == NULL ||
+        (timestamp_length = strftime(timestamp, sizeof(timestamp),
+                                     "%Y-%m-%dT%H:%M:%S", &local_time)) != 19 ||
+        snprintf(timestamp + timestamp_length, sizeof(timestamp) - timestamp_length,
+                 "-03:00") != 6) {
+        ESP_LOGE(TAG, "Failed to get current synchronized timestamp");
+        return ESP_FAIL;
+    }
+
     char json[SUPABASE_RESPONSE_MAX];
     int json_len = snprintf(json, sizeof(json),
-                            "{\"temperatura\":%.9g,\"bpm\":%u,\"spo2\":%u,"
+                            "{\"atualizado_em\":\"%s\",\"temperatura\":%.9g,"
+                            "\"bpm\":%u,\"spo2\":%u,"
                             "\"acc_x\":%.9g,\"acc_y\":%.9g,\"acc_z\":%.9g,"
                             "\"gyro_x\":%.9g,\"gyro_y\":%.9g,\"gyro_z\":%.9g}",
-                            (double)msg->temperature_c, (unsigned)msg->hr_bpm,
+                            timestamp, (double)msg->temperature_c, (unsigned)msg->hr_bpm,
                             (unsigned)msg->spo2_pct, (double)msg->ax, (double)msg->ay,
                             (double)msg->az, (double)msg->gx, (double)msg->gy,
                             (double)msg->gz);
