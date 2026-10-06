@@ -1,11 +1,11 @@
 # SAVI
 
-Bracelet nodes and a Wi-Fi gateway that collect vitals over **ESP-NOW** and write them to **MySQL**.
+Bracelet nodes and a Wi-Fi gateway that collect vitals over **ESP-NOW** and write them to **Supabase**.
 
 ```
 MAX30102 / MAX30205 / BMI270
         │ I2C
-   ESP32-C6 bracelet  ──ESP-NOW──►  ESP32 gateway  ──TCP──►  MySQL
+   ESP32-C6 bracelet  ──ESP-NOW──►  ESP32 gateway  ──HTTPS/REST──►  Supabase
    LED + buzzer                     (STA on AP)
 ```
 
@@ -55,22 +55,25 @@ idf.py -p PORT flash monitor
 
 ## Gateway (`esp32-gateway`)
 
-Connects as a Wi-Fi station (modem sleep off so ESP-NOW RX stays up), then:
+Connects as a Wi-Fi station (modem sleep off so ESP-NOW RX stays up), then sends
+database requests to Supabase using the ESP-IDF HTTPS client:
 
 | Incoming | Action |
 | --- | --- |
-| `MSG_NEED_ID` | Allocate an unused `esp_id` from MySQL (`em_uso=0`), mark it used, send `MSG_ASSIGN_ID` unicast |
-| `MSG_SENSOR_DATA` | `UPDATE braceletes SET temperatura, bpm, spo2, acc_*, gyro_* WHERE esp_id=…` |
-| `MSG_SENSOR_EVENT` `MOTION` | `INSERT INTO alertas (esp_id, tipo, valor)` |
+| `MSG_NEED_ID` | Allocate an unused `esp_id` from Supabase (`em_uso=false`), mark it used, send `MSG_ASSIGN_ID` unicast |
+| `MSG_SENSOR_DATA` | `PATCH /rest/v1/braceletes` for `esp_id`, updating sensor fields |
+| `MSG_SENSOR_EVENT` `MOTION` | `POST /rest/v1/alertas` |
 
 Unassigned packets (`esp_id == 0`) trigger the same ID assignment path.
 
-Configure SSID, password, and MySQL host/user/database in `idf.py menuconfig` → *Example Configuration*. Auth uses `mysql_native_password`.
+Configure the Wi-Fi SSID/password and Supabase project URL/anon key in `idf.py menuconfig` → *Example Configuration*. Use only the anon/public key on the device, with Supabase permissions/RLS configured for the gateway's required reads and writes.
+
+The gateway initializes one HTTPS client after Wi-Fi connects and reuses it for requests; HTTP keep-alive allows the TLS connection to be reused when Supabase keeps it open. The TLS connection is established on the first request, not during startup.
 
 ```bash
 cd esp32-gateway
 idf.py set-target esp32
-idf.py menuconfig   # Wi-Fi SSID/password, MySQL host/user/db
+idf.py menuconfig   # Wi-Fi SSID/password, Supabase URL/anon key
 idf.py -p PORT flash monitor
 ```
 
@@ -95,22 +98,26 @@ ESP-NOW is unencrypted. Both devices must share the same 2.4 GHz channel.
 
 ---
 
-## MySQL schema (expected)
+## Supabase schema (expected)
+
+Create the PostgreSQL tables in the Supabase SQL Editor using [`schema.sql`](./schema.sql).
+The project must permit the anon key to select and update `braceletes` and insert into
+`alertas`; configure RLS policies for these operations if row-level security is enabled.
+Do not put the `service_role` key in firmware.
 
 ```sql
--- braceletes: one row per wearable; em_uso=0 means the id can be handed out
-UPDATE braceletes SET
-  temperatura=…, bpm=…, spo2=…,
-  acc_x=…, acc_y=…, acc_z=…, gyro_x=…, gyro_y=…, gyro_z=…
-WHERE esp_id=…;
+PATCH /rest/v1/braceletes?esp_id=eq.1
+{"temperatura":36.5,"bpm":72,"spo2":98,"acc_x":0.1,"acc_y":0.2,"acc_z":0.3,"gyro_x":1.0,"gyro_y":2.0,"gyro_z":3.0}
 
-INSERT INTO alertas (esp_id, tipo, valor) VALUES (…, 'MOTION', …);
+POST /rest/v1/alertas
+{"esp_id":1,"tipo":"MOTION","valor":1.2}
 
-SELECT esp_id FROM braceletes WHERE em_uso=0 ORDER BY esp_id ASC LIMIT 1;
-UPDATE braceletes SET em_uso=1 WHERE esp_id=… AND em_uso=0;
+GET /rest/v1/braceletes?select=esp_id&em_uso=eq.false&order=esp_id.asc&limit=1
+PATCH /rest/v1/braceletes?esp_id=eq.1&em_uso=eq.false
+{"em_uso":true}
 ```
 
-SQL strings live in `esp32-gateway/main/mysql_db.c`.
+Requests are implemented in [`supabase_db.c`](./esp32-gateway/main/supabase_db.c).
 
 ---
 
@@ -129,7 +136,7 @@ The radio dominates. MAX30102 LEDs stay pulsing for HR/SpO2. LED/buzzer milliamp
 
 ## Bring-up checklist
 
-1. MySQL reachable from the gateway AP; `mysql_native_password` user; `braceletes` / `alertas` columns as above; spare rows with `em_uso=0`.
+1. Supabase URL and anon key configured; `braceletes` / `alertas` tables and anon access policies set up; spare rows with `em_uso=false`.
 2. Flash gateway, wait for `Got IP` and `STA channel N`.
 3. Set the C6 `CONFIG_ESPNOW_CHANNEL` to **N**, then flash the bracelet.
-4. First boot: bracelet logs `requesting from master`; gateway logs `Assigned esp_id`; then 1 Hz `RX sensor` lines and MySQL updates.
+4. First boot: bracelet logs `requesting from master`; gateway logs `Assigned esp_id`; then 1 Hz `RX sensor` lines and Supabase updates.

@@ -10,6 +10,7 @@
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_now.h"
+#include "esp_mac.h"
 #include "driver/gpio.h"
 #include "main.h"
 #include "sensors.h"
@@ -25,7 +26,7 @@
 static const char *TAG = "sensor";
 
 static const uint8_t s_master_mac[ESP_NOW_ETH_ALEN] = {
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+    0x88, 0x57, 0x21, 0xAE, 0xAD, 0x94
 };
 
 static SemaphoreHandle_t s_send_lock;
@@ -208,6 +209,9 @@ static void wifi_init(void)
     ESP_ERROR_CHECK(esp_wifi_set_channel(CONFIG_ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE));
     /* Stay awake until an ID is assigned so MSG_ASSIGN_ID is not missed. */
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    ESP_LOGI(TAG, "ESP-IDF MAC: %02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
 static void radio_runtime_ps(void)

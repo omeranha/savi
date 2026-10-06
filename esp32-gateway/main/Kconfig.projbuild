@@ -4,7 +4,7 @@ menu "Example Configuration"
         string "WiFi SSID"
         default "myssid"
         help
-            Access point the gateway uses to reach MySQL. ESP-NOW uses this AP's channel.
+            Access point the gateway uses to reach Supabase. ESP-NOW uses this AP's channel.
 
     config WIFI_PASSWORD
         string "WiFi password"
@@ -15,26 +15,20 @@ menu "Example Configuration"
         default 10
         range 1 100
 
-    config MYSQL_HOST
-        string "MySQL host"
-        default "192.168.1.10"
+    config SUPABASE_URL
+        string "Supabase project URL"
+        default "https://your-project.supabase.co"
 
-    config MYSQL_PORT
-        int "MySQL port"
-        default 3306
-        range 1 65535
+    config SUPABASE_ANON_KEY
+        string "Supabase anon/public key"
+        default ""
+        help
+            Use the project's anon/public key, never its service_role key.
 
-    config MYSQL_USER
-        string "MySQL user"
-        default "savi"
-
-    config MYSQL_PASSWORD
-        string "MySQL password"
-        default "savi"
-
-    config MYSQL_DATABASE
-        string "MySQL database"
-        default "savi"
+    config SUPABASE_CERT_BUNDLE
+        bool
+        default y
+        select MBEDTLS_CERTIFICATE_BUNDLE
 
     config ESPNOW_CHANNEL
         int "ESP-NOW channel (informational)"

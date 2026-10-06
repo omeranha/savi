@@ -13,7 +13,7 @@
 #include "esp_mac.h"
 #include "esp_now.h"
 #include "main.h"
-#include "mysql_db.h"
+#include "supabase_db.h"
 
 #define RX_QUEUE_LEN 8
 #define ASSIGN_CACHE_LEN 8
@@ -77,7 +77,7 @@ static void assign_id_to_slave(const uint8_t *mac)
 {
     uint32_t id = assigned_lookup(mac);
     if (id == 0) {
-        if (mysql_db_alloc_esp_id(&id) != ESP_OK) {
+        if (supabase_db_alloc_esp_id(&id) != ESP_OK) {
             ESP_LOGE(TAG, "Could not allocate esp_id for " MACSTR, MAC2STR(mac));
             return;
         }
@@ -166,6 +166,9 @@ static void wifi_init(void)
     wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
     ESP_ERROR_CHECK(esp_wifi_get_channel(&primary, &second));
     ESP_LOGI(TAG, "STA channel %u - flash the C6 with the same ESPNOW channel", primary);
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    ESP_LOGI(TAG, "ESP-IDF MAC: %02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
 static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int len)
@@ -207,7 +210,7 @@ static void gateway_task(void *arg)
             }
             ESP_LOGI(TAG, "RX sensor id=%" PRIu32 "  T=%.2fC  HR=%u  SpO2=%u",
                      msg.esp_id, msg.temperature_c, msg.hr_bpm, msg.spo2_pct);
-            if (mysql_db_update_bracelete(&msg) != ESP_OK) {
+            if (supabase_db_update_bracelete(&msg) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to update braceletes for %" PRIu32, msg.esp_id);
             }
         } else if (type == MSG_SENSOR_EVENT && pkt.len >= sizeof(sensor_event_msg_t)) {
@@ -220,7 +223,7 @@ static void gateway_task(void *arg)
             ESP_LOGW(TAG, "RX event id=%" PRIu32 "  %s  value=%.1f",
                      evt.esp_id, event_name(evt.event_id), evt.value);
             if (evt.event_id == EVENT_MOTION_DETECTED) {
-                if (mysql_db_insert_alerta(evt.esp_id, "MOTION", evt.value) != ESP_OK) {
+                if (supabase_db_insert_alerta(evt.esp_id, "MOTION", evt.value) != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to insert alerta for %" PRIu32, evt.esp_id);
                 }
             }
@@ -253,8 +256,9 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    ESP_ERROR_CHECK(mysql_db_init());
     wifi_init();
+    ESP_ERROR_CHECK(supabase_db_init());
     ESP_ERROR_CHECK(espnow_init());
     ESP_LOGI(TAG, "Gateway ready");
+
 }
