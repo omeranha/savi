@@ -24,6 +24,7 @@
 #define NVS_KEY_ESP_ID         "esp_id"
 
 static const char *TAG = "sensor";
+static const bool s_send_reports_without_master = true;
 
 static const uint8_t s_master_mac[ESP_NOW_ETH_ALEN] = {
     0x88, 0x57, 0x21, 0xAE, 0xAD, 0x94
@@ -126,7 +127,7 @@ static void send_to_master(const void *data, size_t len)
 
 static void send_sensor_report(const sensor_readings_t *r)
 {
-    if (bracelet_id() == 0) {
+    if (bracelet_id() == 0 && !s_send_reports_without_master) {
         return;
     }
 
@@ -144,7 +145,7 @@ static void send_sensor_report(const sensor_readings_t *r)
         .gz = r->gz,
     };
 
-    ESP_LOGD(TAG, "TX id=%u  T=%.2fC  HR=%u  SpO2=%u  acc=%.2f,%.2f,%.2f",
+    ESP_LOGI(TAG, "TX id=%u  T=%.2fC  HR=%u  SpO2=%u  acc=%.2f,%.2f,%.2f",
              msg.esp_id, msg.temperature_c, msg.hr_bpm, msg.spo2_pct, msg.ax, msg.ay, msg.az);
     send_to_master(&msg, sizeof(msg));
 }
