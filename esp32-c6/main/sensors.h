@@ -22,16 +22,16 @@
 #define MOTION_DELTA_G         0.4f
 
 typedef struct {
-    float temperature_c;
-    uint8_t hr_bpm;
-    uint8_t spo2_pct;
-    float ax;
-    float ay;
-    float az;
-    float gx;
-    float gy;
-    float gz;
-    bool motion;
+	float temperature_c;
+	uint8_t hr_bpm;
+	uint8_t spo2_pct;
+	float ax;
+	float ay;
+	float az;
+	float gx;
+	float gy;
+	float gz;
+	bool motion;
 } sensor_readings_t;
 
 esp_err_t sensors_init(void);

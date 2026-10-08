@@ -6,7 +6,6 @@
 #include <stdbool.h>
 
 esp_err_t bmi270_imu_init(i2c_master_dev_handle_t dev);
-bool bmi270_imu_read(i2c_master_dev_handle_t dev, float *ax, float *ay, float *az,
-                     float *gx, float *gy, float *gz);
+bool bmi270_imu_read(i2c_master_dev_handle_t dev, float *ax, float *ay, float *az, float *gx, float *gy, float *gz);
 
 #endif
