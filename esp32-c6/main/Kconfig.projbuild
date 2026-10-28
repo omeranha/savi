@@ -1,4 +1,4 @@
-menu "Example Configuration"
+menu "SAVI Bracelet Configuration"
 
     choice ESPNOW_WIFI_MODE
         prompt "WiFi mode"
@@ -13,10 +13,27 @@ menu "Example Configuration"
     endchoice
 
     config ESPNOW_CHANNEL
-        int "Channel"
+        int "Initial ESP-NOW channel"
         default 1
-        range 0 14
+        range 1 13
         help
-            Both the sensor node and the gateway must use the same channel.
+            Starting channel only. The bracelet sweeps channels until the gateway answers and then
+            stores the gateway's live channel in NVS, so this value matters on the first boot only.
+
+    config SAVI_DEMO_MODE
+        bool "Demo mode (synthetic sensor values)"
+        default y
+        help
+            Generate random but plausible vitals instead of reading the MAX30102, MAX30205 and
+            BMI270. Turn it off to drive the real I2C devices. The battery gauge is separate:
+            see Component config -> SAVI battery gauge.
+
+    config SAVI_BATTERY_LOW_PCT
+        int "Low battery alert threshold (%)"
+        default 15
+        range 0 100
+        help
+            The bracelet sends one BATTERY_LOW event when the charge crosses this level, and sends
+            it again only after the charge recovers above it.
 
 endmenu

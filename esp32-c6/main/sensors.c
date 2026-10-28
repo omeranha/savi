@@ -7,12 +7,15 @@
 #include "freertos/semphr.h"
 #include "max30102.h"
 #include "max30205.h"
+#include "savi_battery.h"
 #include <math.h>
 
 static const char *TAG = "sensors";
 
 /* One-shot conversion ~every 250 ms (5 x 50 ms polls). Fever is slow. */
 #define TEMP_READ_PERIOD_POLLS 5
+/* A cell drains over hours, so ~every 10 s (200 x 50 ms polls) is plenty. */
+#define BATTERY_READ_PERIOD_POLLS 200
 
 static SemaphoreHandle_t s_lock;
 static i2c_master_bus_handle_t s_bus;
@@ -22,6 +25,7 @@ static i2c_master_dev_handle_t s_bmi270;
 static bool s_have_max30102;
 static bool s_have_max30205;
 static bool s_have_bmi270;
+static bool s_have_battery;
 
 static i2c_master_dev_handle_t add_dev(uint8_t addr)
 {
@@ -77,6 +81,8 @@ esp_err_t sensors_init(void)
 		ESP_LOGW(TAG, "BMI270 not found at 0x%02X", ADDR_BMI270);
 	}
 
+	s_have_battery = savi_battery_init() == ESP_OK;
+
 	return ESP_OK;
 }
 
@@ -86,6 +92,11 @@ sensor_readings_t sensors_read(void)
 	static float last_temp_c;
 	static int poll_n;
 	static bool temp_pending;
+	static uint8_t last_battery_pct = SAVI_BATTERY_PERCENT_UNKNOWN;
+	static uint16_t last_battery_mv;
+	static int battery_poll_n;
+
+	r.battery_pct = SAVI_BATTERY_PERCENT_UNKNOWN;
 
 	xSemaphoreTake(s_lock, portMAX_DELAY);
 
@@ -111,6 +122,19 @@ sensor_readings_t sensors_read(void)
 		bmi270_imu_read(s_bmi270, &r.ax, &r.ay, &r.az, &r.gx, &r.gy, &r.gz)) {
 		float mag = sqrtf(r.ax * r.ax + r.ay * r.ay + r.az * r.az);
 		r.motion = fabsf(mag - 1.0f) > MOTION_DELTA_G;
+	}
+	if (s_have_battery) {
+		if ((battery_poll_n % BATTERY_READ_PERIOD_POLLS) == 0) {
+			uint16_t cell_mv = 0;
+			uint8_t percent = 0;
+			if (savi_battery_read(&cell_mv, &percent)) {
+				last_battery_mv = cell_mv;
+				last_battery_pct = percent;
+			}
+		}
+		battery_poll_n++;
+		r.battery_mv = last_battery_mv;
+		r.battery_pct = last_battery_pct;
 	}
 
 	xSemaphoreGive(s_lock);

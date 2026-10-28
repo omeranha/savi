@@ -3,6 +3,7 @@
 
 #include "driver/gpio.h"
 #include "esp_err.h"
+#include "savi_battery.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -18,6 +19,7 @@
 #define PIN_LED            GPIO_NUM_4
 #define PIN_BUZZER         GPIO_NUM_5
 
+/* Fever threshold in Celsius: skin temperature at the wrist reads below core. */
 #define TEMP_HIGH_THRESHOLD_C  38.0f
 #define MOTION_DELTA_G         0.4f
 
@@ -25,6 +27,8 @@ typedef struct {
 	float temperature_c;
 	uint8_t hr_bpm;
 	uint8_t spo2_pct;
+	uint8_t battery_pct;   /* SAVI_BATTERY_PERCENT_UNKNOWN when there is no gauge */
+	uint16_t battery_mv;   /* 0 when there is no gauge, for calibration logs */
 	float ax;
 	float ay;
 	float az;
