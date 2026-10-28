@@ -1,40 +1,56 @@
-menu "Example Configuration"
+menu "Gateway Configuration"
 
     config WIFI_SSID
         string "WiFi SSID"
         default "myssid"
         help
-            Access point the gateway uses to reach Supabase. ESP-NOW uses this AP's channel.
+            Access point the gateway uses to reach the MQTT broker. ESP-NOW uses this AP's channel.
 
     config WIFI_PASSWORD
         string "WiFi password"
         default "mypassword"
 
     config WIFI_MAX_RETRY
-        int "WiFi connect retries"
+        int "WiFi connect retries before backing off"
         default 10
         range 1 100
 
-    config SUPABASE_URL
-        string "Supabase project URL"
-        default "https://your-project.supabase.co"
+    config MQTT_BROKER_URI
+        string "MQTT broker URI"
+        default "mqtt://broker.example.com"
+        help
+            URI of the MQTT broker that forwards SAVI messages to the backend.
 
-    config SUPABASE_ANON_KEY
-        string "Supabase anon/public key"
+    config MQTT_USERNAME
+        string "MQTT username"
         default ""
         help
-            Use the project's anon/public key, never its service_role key.
+            Leave empty if the broker does not require a username.
 
-    config SUPABASE_CERT_BUNDLE
+    config MQTT_PASSWORD
+        string "MQTT password"
+        default ""
+        help
+            Leave empty if the broker does not require a password.
+
+    config MQTT_CERT_BUNDLE
         bool
         default y
         select MBEDTLS_CERTIFICATE_BUNDLE
 
-    config ESPNOW_CHANNEL
-        int "ESP-NOW channel (informational)"
-        default 1
-        range 0 14
+    config SAVI_GATEWAY_LOCAL
+        string "Where this gateway is installed"
+        default "unset"
         help
-            The live channel is the WiFi AP channel. Set the C6 node to that same channel.
+            Free text written to the gateways.local column, so the dashboard can say which
+            gateway a bracelet is near. Something like "Ward 2" or "Reception".
+
+    config SAVI_UTC_OFFSET_MINUTES
+        int "UTC offset in minutes for atualizado_em"
+        default -180
+        range -720 840
+        help
+            Single source of truth for the timestamps published to Supabase: it sets both the TZ
+            variable and the ISO-8601 offset suffix. -180 is UTC-03:00 (Brasilia, no DST).
 
 endmenu
