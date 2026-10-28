@@ -5,6 +5,9 @@
       },
       {
         "path": "./esp32-gateway"
+      },
+      {
+        "path": "mqtt_middleware"
       }
     ],
     "settings": {

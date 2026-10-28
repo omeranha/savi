@@ -31,9 +31,14 @@
 *.out
 *.app
 /.vscode
+/mqtt_middleware/.venv/
+/mqtt_middleware/.env
+/mqtt_middleware/__pycache__/
+/mqtt_middleware/tests/__pycache__/
 esp32-c6/.clangd
 /esp32-c6/.devcontainer
 /esp32-c6/.vscode
 esp32-gateway/.clangd
 /esp32-gateway/.devcontainer
 /esp32-gateway/.vscode
+/mqtt_middleware/tests

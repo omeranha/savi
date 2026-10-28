@@ -330,7 +330,7 @@ esp_err_t mqtt_gateway_publish_status(uint8_t battery_pct, int bracelet_count)
 				 add_timestamp(json);
 	/* Same rule as the bracelet: no gauge, no column written. */
 	if (added && savi_battery_pct_valid(battery_pct)) {
-		added = cJSON_AddNumberToObject(json, "battery_percentage", battery_pct) != NULL;
+		added = cJSON_AddNumberToObject(json, "bateria", battery_pct) != NULL;
 	}
 	esp_err_t err = added ? publish_json(MQTT_STATUS_TOPIC, json) : ESP_ERR_NO_MEM;
 	cJSON_Delete(json);

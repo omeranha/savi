@@ -39,7 +39,6 @@ TELEMETRY_BYTE_FIELDS = ("bpm", "spo2")
 TELEMETRY_COLUMNS = (*TELEMETRY_NUMBER_FIELDS, *TELEMETRY_BYTE_FIELDS)
 # Sent only by a device that has a battery gauge, so they are written when present.
 BATTERY_COLUMN = "bateria"
-GATEWAY_BATTERY_COLUMN = "battery_percentage"
 # PostgreSQL stamps the row when the gateway's clock has not synced yet.
 TIMESTAMP_COLUMN = "atualizado_em"
 
@@ -132,7 +131,7 @@ class SupabaseClient:
             "braceletes": status["braceletes"],
             "is_connected": True,
         }
-        for optional in (GATEWAY_BATTERY_COLUMN, TIMESTAMP_COLUMN):
+        for optional in (BATTERY_COLUMN, TIMESTAMP_COLUMN):
             if status.get(optional) is not None:
                 payload[optional] = status[optional]
         self._rows("POST", "gateways", query={"on_conflict": "mac", "select": "gateway_id"}, payload=payload, expected=1, prefer="return=representation,resolution=merge-duplicates")
@@ -284,7 +283,7 @@ def validate_gateway_status(payload: dict[str, Any]) -> dict[str, Any]:
     require_mac(payload)
     require_text(payload, "local", 64)
     require_count(payload, "braceletes")
-    require_optional_percent(payload, GATEWAY_BATTERY_COLUMN)
+    require_optional_percent(payload, BATTERY_COLUMN)
     require_optional_timestamp(payload, TIMESTAMP_COLUMN)
     return payload
 
@@ -361,7 +360,7 @@ class Middleware:
     async def handle_gateway_status(self, payload: dict[str, Any]) -> None:
         status = validate_gateway_status(payload)
         await asyncio.to_thread(self.supabase.write_gateway_status, status)
-        LOGGER.info("Gateway %s at %s is connected with %s bracelet(s), battery %s", status["mac"], status["local"], status["braceletes"], status.get(GATEWAY_BATTERY_COLUMN))
+        LOGGER.info("Gateway %s at %s is connected with %s bracelet(s), battery %s", status["mac"], status["local"], status["braceletes"], status.get(BATTERY_COLUMN))
 
     async def handle_gateway_offline(self, payload: dict[str, Any]) -> None:
         """The broker's last will for a gateway that stopped answering keepalives."""

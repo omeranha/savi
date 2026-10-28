@@ -169,12 +169,12 @@ The gateway publishes with QoS 1 and subscribes only to `savi/id/response`:
 | --- | --- | --- |
 | `savi/telemetry` | Gateway → broker | `{"mac":"aa:bb:cc:dd:ee:ff","esp_id":1,"atualizado_em":"...-03:00","temperatura":36.5,"bpm":72,"spo2":98,"acc_x":0.1,"acc_y":0.2,"acc_z":0.3,"gyro_x":1.0,"gyro_y":2.0,"gyro_z":3.0,"bateria":64}` |
 | `savi/alert` | Gateway → broker | `{"mac":"aa:bb:cc:dd:ee:ff","esp_id":1,"tipo":"BATTERY_LOW","valor":12}` |
-| `savi/gateway` | Gateway → broker | `{"mac":"11:22:33:44:55:66","local":"Ward 2","braceletes":3,"atualizado_em":"...-03:00","battery_percentage":88}` |
+| `savi/gateway` | Gateway → broker | `{"mac":"11:22:33:44:55:66","local":"Ward 2","braceletes":3,"atualizado_em":"...-03:00","bateria":88}` |
 | `savi/gateway/offline` | Broker → middleware | `{"mac":"11:22:33:44:55:66"}`, the gateway's last will |
 | `savi/id/request` | Gateway → broker | `{"mac":"aa:bb:cc:dd:ee:ff"}` |
 | `savi/id/response` | Broker → gateway | `{"mac":"aa:bb:cc:dd:ee:ff","esp_id":1}` |
 
-`bateria` and `battery_percentage` appear only when that device has a working
+`bateria` appear only when that device has a working
 gauge. `atualizado_em` is left out until NTP lands, and PostgreSQL stamps the row
 instead — a reading is never dropped for want of a clock.
 
@@ -336,7 +336,7 @@ the middleware; never put it in the gateway or bracelet firmware.
 | --- | --- |
 | `braceletes` | One row per bracelet: `esp_id` (identity PK), `mac` (unique), `em_uso`, latest vitals, `bateria`, `atualizado_em` |
 | `alertas` | Append-only alert log referencing `braceletes.esp_id` |
-| `gateways` | One row per gateway: `gateway_id`, `mac`, `local`, `battery_percentage`, `is_connected`, `braceletes` (bracelets streaming to it now), `atualizado_em` |
+| `gateways` | One row per gateway: `gateway_id`, `mac`, `local`, `bateria`, `is_connected`, `braceletes` (bracelets streaming to it now), `atualizado_em` |
 
 `esp_id` is the key to search and join on, and the one a bracelet asks for.
 PostgreSQL generates it; `mac` is how the middleware finds the right row, which is
