@@ -1,0 +1,56 @@
+menu "SAVI battery gauge"
+
+    config SAVI_BATTERY_MONITOR
+        bool "Read the battery level from an ADC pin"
+        default y
+        help
+            Read the cell voltage through a resistor divider and report a charge percentage.
+            Turn this off on a board with no divider wired: the pin would float and the device
+            would publish a meaningless value. While off, the bracelet reports
+            SAVI_BATTERY_PCT_UNKNOWN and Supabase keeps a NULL battery column.
+
+    config SAVI_BATTERY_ADC_GPIO
+        int "Battery sense GPIO"
+        depends on SAVI_BATTERY_MONITOR
+        default 3 if IDF_TARGET_ESP32C6
+        default 34 if IDF_TARGET_ESP32
+        default 1
+        range 0 39
+        help
+            Must be an ADC1 pin. On the ESP32-C6 that is GPIO0..GPIO6, and the bracelet already
+            uses GPIO4/5 for the LED and buzzer and GPIO6/7 for I2C, so GPIO0..GPIO3 are free.
+            On the ESP32 gateway, ADC1 is GPIO32..GPIO39, and GPIO34..GPIO39 are input only,
+            which suits a divider. Startup fails loudly if the pin has no ADC channel.
+
+    config SAVI_BATTERY_R_HIGH_KOHM
+        int "Divider resistor from VBAT to the ADC pin (kOhm)"
+        depends on SAVI_BATTERY_MONITOR
+        default 100
+        range 1 10000
+        help
+            With the low-side resistor this must keep the pin under about 3.1 V at a full 4.2 V
+            cell. Values of 100 k and up keep the idle drain of the divider negligible.
+
+    config SAVI_BATTERY_R_LOW_KOHM
+        int "Divider resistor from the ADC pin to GND (kOhm)"
+        depends on SAVI_BATTERY_MONITOR
+        default 100
+        range 1 10000
+
+    config SAVI_BATTERY_EMPTY_MV
+        int "Cell voltage reported as 0% (mV)"
+        depends on SAVI_BATTERY_MONITOR
+        default 3300
+        range 2500 4200
+        help
+            Cut-off of the protection circuit, or the voltage at which the board stops working.
+
+    config SAVI_BATTERY_FULL_MV
+        int "Cell voltage reported as 100% (mV)"
+        depends on SAVI_BATTERY_MONITOR
+        default 4200
+        range 3000 4500
+        help
+            Must be above the 0% voltage. 4200 mV is a fully charged single li-ion cell.
+
+endmenu
