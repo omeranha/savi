@@ -1,0 +1,2 @@
+amqtt>=0.12.1,<0.13
+python-dotenv>=1.0,<2
