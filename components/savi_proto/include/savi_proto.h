@@ -50,6 +50,11 @@ typedef enum {
 	SAVI_EVENT_TEMP_HIGH = 1,
 	SAVI_EVENT_MOTION = 2,
 	SAVI_EVENT_BATTERY_LOW = 3,
+	SAVI_EVENT_FALL = 4,
+	SAVI_EVENT_BPM_LOW = 5,
+	SAVI_EVENT_BPM_HIGH = 6,
+	SAVI_EVENT_SPO2_LOW = 7,
+	SAVI_EVENT_TEMP_LOW = 8,
 } savi_event_id_t;
 
 typedef struct {
@@ -118,6 +123,16 @@ static inline const char *savi_event_name(uint8_t event_id)
 		return "MOTION";
 	case SAVI_EVENT_BATTERY_LOW:
 		return "BATTERY_LOW";
+	case SAVI_EVENT_FALL:
+		return "FALL";
+	case SAVI_EVENT_BPM_LOW:
+		return "BPM_LOW";
+	case SAVI_EVENT_BPM_HIGH:
+		return "BPM_HIGH";
+	case SAVI_EVENT_SPO2_LOW:
+		return "SPO2_LOW";
+	case SAVI_EVENT_TEMP_LOW:
+		return "TEMP_LOW";
 	default:
 		return "UNKNOWN";
 	}
@@ -125,8 +140,19 @@ static inline const char *savi_event_name(uint8_t event_id)
 
 static inline bool savi_event_is_known(uint8_t event_id)
 {
-	return event_id == SAVI_EVENT_TEMP_HIGH || event_id == SAVI_EVENT_MOTION ||
-		   event_id == SAVI_EVENT_BATTERY_LOW;
+	switch (event_id) {
+	case SAVI_EVENT_TEMP_HIGH:
+	case SAVI_EVENT_MOTION:
+	case SAVI_EVENT_BATTERY_LOW:
+	case SAVI_EVENT_FALL:
+	case SAVI_EVENT_BPM_LOW:
+	case SAVI_EVENT_BPM_HIGH:
+	case SAVI_EVENT_SPO2_LOW:
+	case SAVI_EVENT_TEMP_LOW:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static inline bool savi_battery_pct_valid(uint8_t battery_pct)

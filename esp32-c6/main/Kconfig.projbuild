@@ -36,4 +36,175 @@ menu "SAVI Bracelet Configuration"
             The bracelet sends one BATTERY_LOW event when the charge crosses this level, and sends
             it again only after the charge recovers above it.
 
+    menu "Vital sign alert thresholds"
+
+        config SAVI_BPM_LOW_ALERT
+            int "Low heart rate alert threshold (bpm)"
+            default 50
+            range 0 250
+            help
+                A confirmed heart rate below this value raises a BPM_LOW event.
+
+        config SAVI_BPM_HIGH_ALERT
+            int "High heart rate alert threshold (bpm)"
+            default 110
+            range 0 250
+            help
+                A confirmed heart rate above this value raises a BPM_HIGH event.
+
+        config SAVI_SPO2_LOW_ALERT
+            int "Low SpO2 alert threshold (%)"
+            default 98
+            range 0 100
+            help
+                A confirmed SpO2 reading below this value raises a SPO2_LOW event.
+
+        config SAVI_TEMP_LOW_ALERT_C_X10
+            int "Low body temperature alert threshold (0.1 degC)"
+            default 270
+            help
+                A confirmed skin temperature below this value (tenths of a degree Celsius, e.g.
+                270 = 27.0 C) raises a TEMP_LOW event. Only evaluated while the sensor reads above
+                SAVI_TEMP_SKIN_CONTACT_MIN_C_X10.
+
+        config SAVI_TEMP_HIGH_ALERT_C_X10
+            int "High body temperature alert threshold (0.1 degC)"
+            default 280
+            help
+                A confirmed skin temperature above this value (tenths of a degree Celsius) raises
+                a TEMP_HIGH event. Only evaluated while the sensor reads above
+                SAVI_TEMP_SKIN_CONTACT_MIN_C_X10.
+
+        config SAVI_TEMP_SKIN_CONTACT_MIN_C_X10
+            int "Minimum temperature assumed to mean skin contact (0.1 degC)"
+            default 300
+            help
+                Below this value (tenths of a degree Celsius) the MAX30205 is assumed to be off
+                the skin, and both temperature alerts are suppressed.
+
+        config SAVI_VITALS_ALERT_CONFIRMATIONS
+            int "Consecutive out-of-range readings required before alerting"
+            default 3
+            range 1 20
+            help
+                Shared by the BPM, SpO2 and temperature alerts.
+
+        config SAVI_VITALS_ALERT_COOLDOWN_MS
+            int "Minimum time between repeated vitals alerts (ms)"
+            default 30000
+            help
+                Shared by the BPM, SpO2 and temperature alerts. Once one fires it will not fire
+                again for this long, even while the condition persists.
+
+    endmenu
+
+    menu "Fall detection thresholds"
+
+        config SAVI_FALL_IMPACT_G_X100
+            int "Impact acceleration threshold (0.01 g)"
+            default 250
+            help
+                A total acceleration magnitude above this value (hundredths of a g, e.g. 250 =
+                2.5 g) is treated as an impact.
+
+        config SAVI_FALL_FREEFALL_G_X100
+            int "Free-fall acceleration threshold (0.01 g)"
+            default 50
+            help
+                A total acceleration magnitude below this value (hundredths of a g) is treated as
+                free fall.
+
+        config SAVI_FALL_REQUIRE_FREEFALL
+            bool "Require a free-fall phase before the impact"
+            default n
+            help
+                When enabled, an impact only raises a FALL event if a free-fall phase was seen
+                within SAVI_FALL_FREEFALL_WINDOW_MS beforehand.
+
+        config SAVI_FALL_FREEFALL_WINDOW_MS
+            int "Free-fall-to-impact window (ms)"
+            default 800
+
+        config SAVI_FALL_COOLDOWN_MS
+            int "Minimum time between fall alerts (ms)"
+            default 5000
+
+    endmenu
+
+    menu "Sensor hardware calibration"
+
+        config SAVI_MAX30102_I2C_ADDR
+            hex "MAX30102 I2C address"
+            default 0x57
+
+        config SAVI_MAX30102_LED_CURRENT
+            int "MAX30102 LED current (raw amplitude, 0-255, ~0.2 mA per step)"
+            default 60
+            range 0 255
+            help
+                Written directly to both the red and IR LED pulse-amplitude registers. Lower this if readings are
+                noisy or erratic: the signal clips if the LED is too bright for the skin/placement,
+                which shows up as spurious heart-rate peaks.
+
+        config SAVI_MAX30102_ADC_RANGE_NA
+            int "MAX30102 ADC full-scale range (nA)"
+            default 4096
+            help
+                One of 2048, 4096, 8192, 16384.
+
+        config SAVI_MAX30102_PULSE_WIDTH_US
+            int "MAX30102 LED pulse width (us)"
+            default 411
+            help
+                One of 69, 118, 215, 411 (69 = 15-bit ... 411 = 18-bit ADC resolution). The sample rate
+                is fixed at 100 Hz (10 ms per sample), far more than even two 411 us pulses need, so any of the four values
+                is safe here.
+
+        config SAVI_MAX30102_FINGER_THRESHOLD
+            int "Raw IR level above which a finger is assumed to be present"
+            default 50000
+            help
+                Raise it if "no finger" is being missed, lower it if a present finger is not being detected.
+
+        config SAVI_MAX30102_BPM_VALID_MIN
+            int "Lowest heart rate treated as a real reading (bpm)"
+            default 30
+
+        config SAVI_MAX30102_BPM_VALID_MAX
+            int "Highest heart rate treated as a real reading (bpm)"
+            default 220
+            help
+                220 lets through implausible noise-driven spikes as if they were real.
+                Lower it (e.g. 150-180) to have more of those spikes reported as "no reading" instead of a wrong number.
+
+        config SAVI_MAX30102_SPO2_VALID_MIN
+            int "Lowest SpO2 treated as a real reading (%)"
+            default 50
+
+        config SAVI_MAX30205_I2C_ADDR
+            hex "MAX30205 I2C address"
+            default 0x48
+            help
+                0x48 when A0/A1/A2 are all tied to GND. Try 0x49-0x4F if the sensor is not found at
+                boot ("MAX30205 not found at 0x..") -- each address pin tied high instead of low
+                adds 1/2/4 to the low nibble. An intermittent (rather than constant) "not found"
+                across power cycles usually means a loose wire/breadboard contact instead, since the
+                address is read only once at boot.
+
+        config SAVI_MAX30205_SANE_MIN_C_X10
+            int "Lowest temperature treated as a real reading (0.1 degC)"
+            default 200
+
+        config SAVI_MAX30205_SANE_MAX_C_X10
+            int "Highest temperature treated as a real reading (0.1 degC)"
+            default 450
+
+        config SAVI_BMI270_I2C_ADDR
+            hex "BMI270 I2C address"
+            default 0x68
+            help
+                0x68 when SDO is tied to GND, 0x69 when tied high.
+
+    endmenu
+
 endmenu

@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-import argparse
-import asyncio
-import json
-import logging
-import math
-import os
-import re
+import argparse, asyncio, json, logging, math, os, re
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -42,10 +36,8 @@ BATTERY_COLUMN = "bateria"
 # PostgreSQL stamps the row when the gateway's clock has not synced yet.
 TIMESTAMP_COLUMN = "atualizado_em"
 
-
 class SupabaseError(Exception):
     pass
-
 
 @dataclass(frozen=True)
 class Settings:
@@ -54,7 +46,6 @@ class Settings:
     log_level: str
     supabase_url: str
     supabase_key: str = field(repr=False)
-
 
 class SupabaseClient:
     """The bracelet MAC is the device identity; PostgreSQL owns esp_id."""
@@ -114,8 +105,7 @@ class SupabaseClient:
         for optional in (BATTERY_COLUMN, TIMESTAMP_COLUMN):
             if telemetry.get(optional) is not None:
                 payload[optional] = telemetry[optional]
-        # ON CONFLICT (mac) DO UPDATE: the row appears by itself the first time a
-        # bracelet reports, and em_uso keeps whatever a human set on it.
+        # ON CONFLICT (mac) DO UPDATE: the row appears by itself the first time a bracelet reports, and em_uso keeps whatever a human set on it.
         rows = self._rows("POST", "braceletes", query={"on_conflict": "mac", "select": "esp_id"}, payload=payload, expected=1, prefer="return=representation,resolution=merge-duplicates")
         return require_esp_id(rows[0])
 
@@ -129,7 +119,7 @@ class SupabaseClient:
             "mac": status["mac"],
             "local": status["local"],
             "braceletes": status["braceletes"],
-            "is_connected": True,
+            "conectado": True,
         }
         for optional in (BATTERY_COLUMN, TIMESTAMP_COLUMN):
             if status.get(optional) is not None:
@@ -138,12 +128,12 @@ class SupabaseClient:
 
     def mark_gateway_offline(self, mac: str) -> bool:
         """False when Supabase has never heard of this gateway."""
-        rows = self._rows("PATCH", "gateways", query={"mac": f"eq.{mac}"}, payload={"is_connected": False, "braceletes": 0})
+        rows = self._rows("PATCH", "gateways", query={"mac": f"eq.{mac}"}, payload={"conectado": False, "braceletes": 0})
         return len(rows) > 0
 
     def mark_all_gateways_offline(self) -> int:
         """Called at startup: anything still flagged connected is stale."""
-        rows = self._rows("PATCH", "gateways", query={"is_connected": "eq.true"}, payload={"is_connected": False, "braceletes": 0})
+        rows = self._rows("PATCH", "gateways", query={"conectado": "eq.true"}, payload={"conectado": False, "braceletes": 0})
         return len(rows)
 
     def bracelet_id_for(self, mac: str) -> int:
@@ -170,19 +160,16 @@ class SupabaseClient:
             raise SupabaseError(f"{mac} matches {len(rows)} braceletes rows, mac must be unique")
         return require_esp_id(rows[0])
 
-
 def require_esp_id(row: dict[str, Any]) -> int:
     value = row.get("esp_id")
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError(f"Supabase returned esp_id={value!r}, expected a positive integer")
     return value
 
-
 def normalize_mac(value: Any) -> str:
     if not isinstance(value, str) or MAC_PATTERN.fullmatch(value) is None:
         raise ValueError("mac must be six hexadecimal octets separated by colons")
     return value.lower()
-
 
 def parse_json(payload: bytes) -> dict[str, Any]:
     try:
@@ -193,11 +180,9 @@ def parse_json(payload: bytes) -> dict[str, Any]:
         raise ValueError("payload must be a JSON object")
     return value
 
-
 def require_mac(payload: dict[str, Any]) -> str:
     payload["mac"] = normalize_mac(payload.get("mac"))
     return payload["mac"]
-
 
 def require_number(payload: dict[str, Any], key: str) -> int | float:
     value = payload.get(key)
@@ -207,13 +192,11 @@ def require_number(payload: dict[str, Any], key: str) -> int | float:
         raise ValueError(f"{key} must be finite")
     return value
 
-
 def require_byte(payload: dict[str, Any], key: str) -> int:
     value = payload.get(key)
     if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 255:
         raise ValueError(f"{key} must be an integer from 0 to 255")
     return value
-
 
 def require_optional_percent(payload: dict[str, Any], key: str) -> int | None:
     """A bracelet without a battery gauge omits the key instead of inventing a value."""
@@ -223,7 +206,6 @@ def require_optional_percent(payload: dict[str, Any], key: str) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
         raise ValueError(f"{key} must be an integer from 0 to 100 or absent")
     return value
-
 
 def require_timestamp(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
@@ -237,13 +219,11 @@ def require_timestamp(payload: dict[str, Any], key: str) -> str:
         raise ValueError(f"{key} must include a UTC offset")
     return value
 
-
 def require_optional_timestamp(payload: dict[str, Any], key: str) -> str | None:
     """The gateway leaves this out until NTP lands, and PostgreSQL stamps the row."""
     if payload.get(key) is None:
         return None
     return require_timestamp(payload, key)
-
 
 def require_count(payload: dict[str, Any], key: str) -> int:
     value = payload.get(key)
@@ -251,13 +231,11 @@ def require_count(payload: dict[str, Any], key: str) -> int:
         raise ValueError(f"{key} must be an integer of 0 or more")
     return value
 
-
 def require_text(payload: dict[str, Any], key: str, limit: int) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not 1 <= len(value) <= limit:
         raise ValueError(f"{key} must be a string of 1 to {limit} characters")
     return value
-
 
 def validate_telemetry(payload: dict[str, Any]) -> dict[str, Any]:
     require_mac(payload)
@@ -269,7 +247,6 @@ def validate_telemetry(payload: dict[str, Any]) -> dict[str, Any]:
     require_optional_percent(payload, BATTERY_COLUMN)
     return payload
 
-
 def validate_alert(payload: dict[str, Any]) -> dict[str, Any]:
     require_mac(payload)
     alert_type = payload.get("tipo")
@@ -278,7 +255,6 @@ def validate_alert(payload: dict[str, Any]) -> dict[str, Any]:
     require_number(payload, "valor")
     return payload
 
-
 def validate_gateway_status(payload: dict[str, Any]) -> dict[str, Any]:
     require_mac(payload)
     require_text(payload, "local", 64)
@@ -286,7 +262,6 @@ def validate_gateway_status(payload: dict[str, Any]) -> dict[str, Any]:
     require_optional_percent(payload, BATTERY_COLUMN)
     require_optional_timestamp(payload, TIMESTAMP_COLUMN)
     return payload
-
 
 class Middleware:
     def __init__(self, client: MQTTClient, supabase: SupabaseClient) -> None:
@@ -308,7 +283,7 @@ class Middleware:
         LOGGER.info("Subscribed to %s", ", ".join(topics))
         cleared = await asyncio.to_thread(self.supabase.mark_all_gateways_offline)
         if cleared:
-            LOGGER.info("Cleared is_connected on %d gateway row(s) left over from the last run", cleared)
+            LOGGER.info("Cleared conectado on %d gateway row(s) left over from the last run", cleared)
         while True:
             message = await self.client.deliver_message()
             await self.handle(message.topic, message.data)
@@ -371,17 +346,14 @@ class Middleware:
         else:
             LOGGER.warning("Gateway %s dropped off the broker but has no row yet", mac)
 
-
 def broker_config(bind: str, port: int) -> dict[str, Any]:
     return {
         "listeners": {"default": {"type": "tcp", "bind": f"{bind}:{port}"}},
         "plugins": {"amqtt.plugins.authentication.AnonymousAuthPlugin": {"allow_anonymous": True}},
     }
 
-
 def client_host(bind: str) -> str:
     return "127.0.0.1" if bind in WILDCARD_BINDS else bind
-
 
 async def run_server(settings: Settings) -> None:
     supabase = SupabaseClient(settings.supabase_url, settings.supabase_key)
@@ -396,7 +368,6 @@ async def run_server(settings: Settings) -> None:
         stack.push_async_callback(client.disconnect)
         await Middleware(client, supabase).run()
 
-
 def env_int(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -405,7 +376,6 @@ def env_int(name: str, default: int) -> int:
         return int(raw)
     except ValueError:
         raise SystemExit(f"{name} must be an integer, got {raw!r}") from None
-
 
 def parse_settings(argv: list[str] | None = None) -> Settings:
     parser = argparse.ArgumentParser(description="Run the SAVI MQTT broker and Supabase middleware.")
@@ -424,17 +394,14 @@ def parse_settings(argv: list[str] | None = None) -> Settings:
 
     return Settings(args.bind, args.port, args.log_level, supabase_url, supabase_key)
 
-
 def load_environment(env_file: Path | None = None) -> None:
     load_dotenv(env_file or Path(__file__).with_name(".env"), override=False)
-
 
 def configure_logging(level: str) -> None:
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)-7s %(name)s | %(message)s")
     LOGGER.setLevel(level)
     logging.getLogger("amqtt").setLevel(logging.INFO if level == "DEBUG" else logging.WARNING)
     logging.getLogger("transitions").setLevel(logging.WARNING)
-
 
 def main() -> None:
     load_environment()
@@ -449,7 +416,6 @@ def main() -> None:
         raise SystemExit(f"Supabase is unreachable: {exc}") from exc
     except ValueError as exc:
         raise SystemExit(f"Invalid configuration: {exc}") from exc
-
 
 if __name__ == "__main__":
     main()

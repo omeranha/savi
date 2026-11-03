@@ -2,6 +2,8 @@
 #include "i2c_io.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_timer.h"
+#include <math.h>
 
 #define REG_CHIP_ID   0x00
 #define REG_DATA_ACC  0x0C
@@ -69,4 +71,48 @@ bool bmi270_imu_read(i2c_master_dev_handle_t dev, float *ax, float *ay, float *a
 	*gy = (float)gyr_y / GYR_LSB_PER_DPS;
 	*gz = (float)gyr_z / GYR_LSB_PER_DPS;
 	return true;
+}
+
+/* Derived from the Kconfig thresholds (hundredths of a g) so the rest of this file can work in
+ * plain floats. A bool Kconfig option that is unset leaves its CONFIG_ macro undefined entirely,
+ * so it has to be read with #if, never as a bare C expression. */
+#define FALL_IMPACT_G           (CONFIG_SAVI_FALL_IMPACT_G_X100 / 100.0f)
+#define FALL_FREEFALL_G         (CONFIG_SAVI_FALL_FREEFALL_G_X100 / 100.0f)
+#if CONFIG_SAVI_FALL_REQUIRE_FREEFALL
+#define FALL_REQUIRE_FREEFALL 1
+#else
+#define FALL_REQUIRE_FREEFALL 0
+#endif
+
+static bool s_saw_freefall;
+static int64_t s_freefall_us;
+static bool s_fired_before;
+static int64_t s_last_fire_us;
+
+bool bmi270_imu_check_fall(float ax, float ay, float az, float *peak_g)
+{
+	float mag = sqrtf(ax * ax + ay * ay + az * az);
+	int64_t now_us = esp_timer_get_time();
+
+	if (mag < FALL_FREEFALL_G) {
+		s_saw_freefall = true;
+		s_freefall_us = now_us;
+	}
+
+	if (mag <= FALL_IMPACT_G) {
+		return false;
+	}
+
+	bool freefall_recent = s_saw_freefall && (now_us - s_freefall_us) <= (int64_t)CONFIG_SAVI_FALL_FREEFALL_WINDOW_MS * 1000;
+	bool condition = !FALL_REQUIRE_FREEFALL || freefall_recent;
+	bool past_cooldown = !s_fired_before || (now_us - s_last_fire_us) > (int64_t)CONFIG_SAVI_FALL_COOLDOWN_MS * 1000;
+
+	if (condition && past_cooldown) {
+		s_fired_before = true;
+		s_last_fire_us = now_us;
+		s_saw_freefall = false;
+		*peak_g = mag;
+		return true;
+	}
+	return false;
 }

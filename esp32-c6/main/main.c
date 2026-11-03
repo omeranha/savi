@@ -23,6 +23,10 @@
 #define EVENT_POLL_PERIOD_MS   50
 #define SENSOR_SEND_PERIOD_MS  1000
 #define LED_BLINK_PERIOD_MS    200
+/* One-shot alerts (fall, BPM/SpO2/temp) only last a single poll, so stretch the LED/buzzer out
+ * long enough for a person to notice. */
+#define INDICATOR_HOLD_MS      3000
+#define INDICATOR_HOLD_POLLS   (INDICATOR_HOLD_MS / EVENT_POLL_PERIOD_MS)
 #define DISCOVERY_WINDOW_MS    600
 #define HELLO_RETRY_MIN_MS     2000
 #define HELLO_RETRY_MAX_MS     30000
@@ -344,9 +348,9 @@ static void send_sensor_event(uint32_t esp_id, uint8_t event_id, float value)
 static void sensor_task(void *arg)
 {
 	(void)arg;
-	bool temp_high_latched = false;
 	bool motion_latched = false;
 	bool battery_low_latched = false;
+	int indicator_hold_polls = 0;
 	int send_acc_ms = 0;
 
 	while (1) {
@@ -354,11 +358,27 @@ static void sensor_task(void *arg)
 		uint32_t esp_id = bracelet_id();
 		bool ready = esp_id != 0 && s_welcomed;
 
-		bool temp_high = r.temperature_c >= TEMP_HIGH_THRESHOLD_C;
-		if (temp_high && !temp_high_latched && ready) {
-			send_sensor_event(esp_id, SAVI_EVENT_TEMP_HIGH, r.temperature_c);
+		bool one_shot_alert = r.alert_bpm_low || r.alert_bpm_high || r.alert_spo2_low || r.alert_temp_low || r.alert_temp_high || r.fall;
+		if (ready && one_shot_alert) {
+			if (r.alert_bpm_low) {
+				send_sensor_event(esp_id, SAVI_EVENT_BPM_LOW, (float)r.hr_bpm);
+			}
+			if (r.alert_bpm_high) {
+				send_sensor_event(esp_id, SAVI_EVENT_BPM_HIGH, (float)r.hr_bpm);
+			}
+			if (r.alert_spo2_low) {
+				send_sensor_event(esp_id, SAVI_EVENT_SPO2_LOW, (float)r.spo2_pct);
+			}
+			if (r.alert_temp_low) {
+				send_sensor_event(esp_id, SAVI_EVENT_TEMP_LOW, r.temperature_c);
+			}
+			if (r.alert_temp_high) {
+				send_sensor_event(esp_id, SAVI_EVENT_TEMP_HIGH, r.temperature_c);
+			}
+			if (r.fall) {
+				send_sensor_event(esp_id, SAVI_EVENT_FALL, r.fall_peak_g);
+			}
 		}
-		temp_high_latched = temp_high;
 
 		bool battery_low = r.battery_pct != SAVI_BATTERY_PERCENT_UNKNOWN && r.battery_pct <= CONFIG_SAVI_BATTERY_LOW_PCT;
 		if (battery_low && !battery_low_latched && ready) {
@@ -372,8 +392,15 @@ static void sensor_task(void *arg)
 		}
 		motion_latched = r.motion;
 
-		/* The LED and buzzer answer to any event, not just motion. */
-		indicators_set_alert(r.motion || temp_high || battery_low);
+		/* One-shot alerts fire for a single ~50 ms poll, too short to be heard or seen, so hold
+		 * the indicators active for a bit after one fires. Continuous conditions (motion,
+		 * battery) keep driving them directly. */
+		if (one_shot_alert) {
+			indicator_hold_polls = INDICATOR_HOLD_POLLS;
+		} else if (indicator_hold_polls > 0) {
+			indicator_hold_polls--;
+		}
+		indicators_set_alert(r.motion || battery_low || indicator_hold_polls > 0);
 
 		send_acc_ms += EVENT_POLL_PERIOD_MS;
 		if (send_acc_ms >= SENSOR_SEND_PERIOD_MS) {

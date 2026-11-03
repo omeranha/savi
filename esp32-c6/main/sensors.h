@@ -12,15 +12,15 @@
 #define PIN_I2C_SCL        GPIO_NUM_7
 #define I2C_FREQ_HZ        400000
 
-#define ADDR_MAX30102      0x57
-#define ADDR_MAX30205      0x48  /* A0=A1=A2=GND */
-#define ADDR_BMI270        0x68  /* SDO to GND; use 0x69 if SDO is high */
+/* I2C addresses, LED/ADC calibration and finger/temperature sanity ranges are configurable under
+ * Component config -> SAVI Bracelet Configuration -> Sensor hardware calibration (CONFIG_SAVI_*),
+ * used directly by sensors.c/max30102.c/max30205.c/bmi270_imu.c. */
 
 #define PIN_LED            GPIO_NUM_4
 #define PIN_BUZZER         GPIO_NUM_5
 
-/* Fever threshold in Celsius: skin temperature at the wrist reads below core. */
-#define TEMP_HIGH_THRESHOLD_C  38.0f
+/* Fever threshold handling moved to the Kconfig-backed vital-sign alert thresholds
+ * (SAVI_TEMP_HIGH_ALERT_C_X10 etc.); see main.c's sensor_task. */
 #define MOTION_DELTA_G         0.4f
 
 typedef struct {
@@ -36,6 +36,13 @@ typedef struct {
 	float gy;
 	float gz;
 	bool motion;
+	bool fall;             /* one-shot: true exactly once when a fall is detected */
+	float fall_peak_g;     /* acceleration magnitude that triggered the fall, valid when fall is true */
+	bool alert_bpm_low;    /* one-shot vital-sign alerts, gated by confirmations + cooldown */
+	bool alert_bpm_high;
+	bool alert_spo2_low;
+	bool alert_temp_low;
+	bool alert_temp_high;
 } sensor_readings_t;
 
 esp_err_t sensors_init(void);

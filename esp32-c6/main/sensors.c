@@ -56,29 +56,29 @@ esp_err_t sensors_init(void)
 	};
 	ESP_ERROR_CHECK(i2c_new_master_bus(&bus_cfg, &s_bus));
 
-	s_max30102 = add_dev(ADDR_MAX30102);
-	s_max30205 = add_dev(ADDR_MAX30205);
-	s_bmi270 = add_dev(ADDR_BMI270);
+	s_max30102 = add_dev((uint8_t)CONFIG_SAVI_MAX30102_I2C_ADDR);
+	s_max30205 = add_dev((uint8_t)CONFIG_SAVI_MAX30205_I2C_ADDR);
+	s_bmi270 = add_dev((uint8_t)CONFIG_SAVI_BMI270_I2C_ADDR);
 
 	if (max30102_init(s_max30102) == ESP_OK) {
 		s_have_max30102 = true;
 		ESP_LOGI(TAG, "MAX30102 ready");
 	} else {
-		ESP_LOGW(TAG, "MAX30102 not found at 0x%02X", ADDR_MAX30102);
+		ESP_LOGW(TAG, "MAX30102 not found at 0x%02X", CONFIG_SAVI_MAX30102_I2C_ADDR);
 	}
 
 	if (max30205_init(s_max30205) == ESP_OK) {
 		s_have_max30205 = true;
 		ESP_LOGI(TAG, "MAX30205 ready");
 	} else {
-		ESP_LOGW(TAG, "MAX30205 not found at 0x%02X", ADDR_MAX30205);
+		ESP_LOGW(TAG, "MAX30205 not found at 0x%02X", CONFIG_SAVI_MAX30205_I2C_ADDR);
 	}
 
 	if (bmi270_imu_init(s_bmi270) == ESP_OK) {
 		s_have_bmi270 = true;
 		ESP_LOGI(TAG, "BMI270 ready");
 	} else {
-		ESP_LOGW(TAG, "BMI270 not found at 0x%02X", ADDR_BMI270);
+		ESP_LOGW(TAG, "BMI270 not found at 0x%02X", CONFIG_SAVI_BMI270_I2C_ADDR);
 	}
 
 	s_have_battery = savi_battery_init() == ESP_OK;
@@ -102,8 +102,11 @@ sensor_readings_t sensors_read(void)
 
 	if (s_have_max30205) {
 		if (temp_pending) {
-			if (max30205_read_c(s_max30205, &last_temp_c)) {
+			bool ok = max30205_read_c(s_max30205, &last_temp_c);
+			if (ok) {
 				max30205_shutdown(s_max30205);
+				bool sane = last_temp_c > MAX30205_SANE_MIN_C && last_temp_c < MAX30205_SANE_MAX_C;
+				max30205_evaluate(last_temp_c, sane);
 			}
 			temp_pending = false;
 		} else if ((poll_n % TEMP_READ_PERIOD_POLLS) == 0) {
@@ -112,16 +115,18 @@ sensor_readings_t sensors_read(void)
 			}
 		}
 		r.temperature_c = last_temp_c;
+		max30205_get_alerts(&r.alert_temp_low, &r.alert_temp_high);
 		poll_n++;
 	}
 	if (s_have_max30102) {
 		max30102_poll(s_max30102);
-		max30102_get(&r.hr_bpm, &r.spo2_pct);
+		max30102_get(&r.hr_bpm, &r.spo2_pct, &r.alert_bpm_low, &r.alert_bpm_high, &r.alert_spo2_low);
 	}
 	if (s_have_bmi270 &&
 		bmi270_imu_read(s_bmi270, &r.ax, &r.ay, &r.az, &r.gx, &r.gy, &r.gz)) {
 		float mag = sqrtf(r.ax * r.ax + r.ay * r.ay + r.az * r.az);
 		r.motion = fabsf(mag - 1.0f) > MOTION_DELTA_G;
+		r.fall = bmi270_imu_check_fall(r.ax, r.ay, r.az, &r.fall_peak_g);
 	}
 	if (s_have_battery) {
 		if ((battery_poll_n % BATTERY_READ_PERIOD_POLLS) == 0) {
